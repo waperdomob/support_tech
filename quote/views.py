@@ -2,41 +2,24 @@ import json
 from django.db import transaction
 from django.shortcuts import redirect, render
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
-from django.template.loader import get_template
-from weasyprint import HTML
+from django.http import JsonResponse
 from django.urls import reverse_lazy
-from django.views import View
 from django.views.generic import CreateView, ListView,UpdateView,DeleteView
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Q
 
-from support_tech.settings import STATIC_URL
-
-
-from sales.forms import VentasForm
-from sales.models import Venta, DetVenta
+from quote.forms import cotizacionForm
+from sales.models import Cotizacion, DetCotizacion
 from inventory.models import Producto
 from clients.models import Cliente
+
 # Create your views here.
 
-def index(request):
-    if request.user.is_authenticated:
-
-        return render(request,'index.html')
-    
-    else:
-        return redirect('not_found')
-    
-
-def page_not_found404(request, exception):
-    return render(request,'404.html')
-
-class SaleListView(PermissionRequiredMixin, ListView):
-    permission_required = 'Ventas.view_venta'
-    model = Venta
-    template_name = 'venta/list.html'
-    permission_required = 'venta.view_sale'
+class QuoteListView(PermissionRequiredMixin, ListView):
+    model = Cotizacion
+    template_name = 'cotizacion/cotizaciones.html'
+    permission_required = 'cotizacion.view_cotizacion'
     paginate_by = 2
 
     def get_queryset(self):
@@ -48,11 +31,11 @@ class SaleListView(PermissionRequiredMixin, ListView):
             action = request.POST['action']
             if action == 'searchdata':
                 data = []
-                for i in Venta.objects.all():
+                for i in Cotizacion.objects.all():
                     data.append(i.toJSON())
             elif action == 'search_details_prod':
                 data = []
-                for i in DetVenta.objects.filter(venta_id=request.POST['id']):
+                for i in Cotizacion.objects.filter(venta_id=request.POST['id']):
                     data.append(i.toJSON())
             else:
                 data['error'] = 'Ha ocurrido un error'
@@ -62,22 +45,22 @@ class SaleListView(PermissionRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = {}
-        context['title'] = 'Listado de Ventas'
-        context['ventas'] = self.get_queryset()
-        context['create_url'] = reverse_lazy('venta_create')
-        context['list_url'] = reverse_lazy('venta_list')
+        context['title'] = 'Listado de Cotizaciones'
+        context['cotizaciones'] = self.get_queryset()
+        context['create_url'] = reverse_lazy('cotizacion_create')
+        context['list_url'] = reverse_lazy('cotizacion_list')
         return context
 
     def get(self, request, *args, **kwargs):              
         return render(request,self.template_name,self.get_context_data())
 
 
-class SaleCreateView(PermissionRequiredMixin, CreateView):
-    permission_required = 'Ventas.add_venta'
-    model = Venta
-    form_class = VentasForm
-    template_name = 'venta/create.html'
-    success_url = reverse_lazy('venta_create')
+class QuoteCreateView(PermissionRequiredMixin, CreateView):
+    permission_required = 'cotizacion.add_cotizacion'
+    model = Cotizacion
+    form_class = cotizacionForm
+    template_name = 'cotizacion/createC.html'
+    success_url = reverse_lazy('cotizacion_create')
     url_redirect = success_url
 
     @method_decorator(csrf_exempt)
@@ -95,10 +78,9 @@ class SaleCreateView(PermissionRequiredMixin, CreateView):
                 clientes = Cliente.objects.filter(nombre__icontains=term)[0:10]
                 for i in clientes:
                     item = i.toJSON()
-                    print(i)
                     item['text'] = i.nombre
                     data.append(item)
-                    
+
             elif action == 'search_autocomplete':
                 data = []
                 ids_exclude = json.loads(request.POST['ids'])
@@ -112,28 +94,23 @@ class SaleCreateView(PermissionRequiredMixin, CreateView):
             elif action == 'add':
                 with transaction.atomic():
                     vents = json.loads(request.POST['vents'])
-                    venta = Venta()
-                    venta.fecha_compra = vents['fecha_compra']
-                    venta.cliente_id = vents['cliente']
-                    venta.vendedor_id = request.user.id
-                    venta.metodoPago_id = vents['metodoPago']
-                    venta.subtotal = float(vents['subtotal'])
-                    venta.descuento = float(vents['descuento'])
-                    venta.total = float(vents['total'])
-                    venta.save()
+                    cotizacion = Cotizacion()
+                    cotizacion.fecha = vents['fecha_compra']
+                    cotizacion.cliente_id = vents['cliente']
+                    cotizacion.vendedor_id = request.user.id
+                    cotizacion.subtotal = float(vents['subtotal'])
+                    cotizacion.descuento = float(vents['descuento'])
+                    cotizacion.total = float(vents['total'])
+                    cotizacion.save()
 
                     for i in vents['productos']:
-                        detalle = DetVenta()
-                        detalle.venta_id = venta.id
+                        detalle = DetCotizacion()
+                        detalle.cotizacion_id = cotizacion.id
                         detalle.producto_id = i['id']
                         detalle.cant = int(i['cant'])
                         detalle.precio = float(i['precio_venta'])
                         detalle.subtotal = float(i['subtotal'])
                         detalle.save()
-                        cantidad_ActualP = Producto.objects.filter(pk = i['id']).values_list('cantidad_total',flat=True)
-                        cantidad_ActualP = int(cantidad_ActualP[0])
-                        cantidad_ActualP = cantidad_ActualP - detalle.cant
-                        Producto.objects.filter(id = i['id']).update(cantidad_total = cantidad_ActualP)
             
             else:
                 data['error'] = 'No ha ingresado a ninguna opción'
@@ -143,19 +120,19 @@ class SaleCreateView(PermissionRequiredMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Creación de una Venta'
+        context['title'] = 'Creación de una Cotización'
         context['list_url'] = self.success_url
         context['action'] = 'add'
         context['detalle'] = []
 
         return context
 
-class SaleEditView(PermissionRequiredMixin,UpdateView):
-    permission_required = 'Ventas.change_venta'
-    model = Venta    
-    form_class= VentasForm
-    template_name = 'venta/create.html'
-    success_url = reverse_lazy('venta_list')
+class QuoteEditView(PermissionRequiredMixin,UpdateView):
+    permission_required = 'cotizacion.change_cotizacion'
+    model = Cotizacion    
+    form_class= cotizacionForm
+    template_name = 'cotizacion/createC.html'
+    success_url = reverse_lazy('cotizacion_list')
 
     @method_decorator(csrf_exempt)
     def dispatch(self, request, *args, **kwargs):
@@ -166,13 +143,13 @@ class SaleEditView(PermissionRequiredMixin,UpdateView):
         data = {}
         try:
             action = request.POST['action']
+
             if action == 'search_cliente':
                 data = []
                 term = request.POST['term'].strip()
                 clientes = Cliente.objects.filter(nombre__icontains=term)[0:10]
                 for i in clientes:
                     item = i.toJSON()
-                    print(i)
                     item['text'] = i.nombre
                     data.append(item)
 
@@ -186,18 +163,17 @@ class SaleEditView(PermissionRequiredMixin,UpdateView):
             elif action == 'edit':
                 with transaction.atomic():
                     vents = json.loads(request.POST['vents'])
-                    venta = self.get_object()
-                    venta.fecha_compra = vents['fecha_compra']
-                    venta.cliente_id = vents['cliente']
-                    venta.metodoPago_id = vents['metodoPago']
-                    venta.subtotal = float(vents['subtotal'])
-                    venta.descuento = float(vents['descuento'])
-                    venta.total = float(vents['total'])
-                    venta.save()
-                    venta.detventa_set.all().delete()
+                    cotizacion = self.get_object()
+                    cotizacion.fecha = vents['fecha_compra']
+                    cotizacion.cliente_id = vents['cliente']
+                    cotizacion.subtotal = float(vents['subtotal'])
+                    cotizacion.descuento = float(vents['descuento'])
+                    cotizacion.total = float(vents['total'])
+                    cotizacion.save()
+                    cotizacion.detventa_set.all().delete()
                     for i in vents['productos']:
-                        detalle = DetVenta()
-                        detalle.venta_id = venta.id
+                        detalle = DetCotizacion()
+                        detalle.cotizacion_id = cotizacion.id
                         detalle.producto_id = i['id']
                         detalle.cant = int(i['cant'])
                         detalle.precio = float(i['precio_venta'])
@@ -218,7 +194,7 @@ class SaleEditView(PermissionRequiredMixin,UpdateView):
     def get_details_product(self):
         data = []
         try:
-            for i in DetVenta.objects.filter(venta=self.kwargs['pk']):
+            for i in DetCotizacion.objects.filter(venta=self.kwargs['pk']):
                 item = i.producto.toJSON()
                 item['cant'] = i.cant
                 data.append(item)
@@ -228,38 +204,20 @@ class SaleEditView(PermissionRequiredMixin,UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Edición de una Venta'
+        context['title'] = 'Edición de una Cotización'
         context['list_url'] = self.success_url
         context['action'] = 'edit'
         context['detalle'] = json.dumps(self.get_details_product())
         return context
 
-class SaleDeleteView(PermissionRequiredMixin,DeleteView):
-    permission_required = 'Ventas.delete_venta'
-    model = Venta
-    template_name = 'venta/delete.html'
-    success_url = reverse_lazy('venta_list')
+class QuoteDeleteView(PermissionRequiredMixin,DeleteView):
+    permission_required = 'cotizacion.delete_cotizacion'
+    model = Cotizacion
+    template_name = 'cotizacion/deleteC.html'
+    success_url = reverse_lazy('cotizacion_list')
     url_redirect = success_url
 
     def post(self, request,pk, *args, **kwargs):        
-        object = Venta.objects.get(id=pk)
+        object = Cotizacion.objects.get(id=pk)
         object.delete()
-        return redirect('venta_list')
-    
-
-class HistoriaClinicaPDF(View):
-    
-    def get(self, request, *args, **kwargs):
-        try:
-            template = get_template('hcPDF.html')
-            context = {
-                'object': Venta.objects.get(pk=self.kwargs['pk']),
-                'icon' : '{}{}'.format(STATIC_URL, 'img/support_tech_factura.jpg')
-            }
-            html_template = template.render(context)
-            pdf = HTML(string=html_template, base_url= request.build_absolute_uri('/')).write_pdf()
-            return HttpResponse(pdf, content_type= 'application/pdf')
-            
-        except:
-            pass
-        return HttpResponseRedirect(reverse_lazy('historiaClinica'))
+        return redirect('cotizacion_list')

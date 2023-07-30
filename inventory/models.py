@@ -42,5 +42,4 @@ class Producto(models.Model):
         item['precio_compra'] = format(self.precio_compra,'.2f')
         item['precio_venta'] = format(self.precio_venta,'.2f')   
         item['categoria'] = self.categoria.toJSON()
-        item['proveedor'] = self.proveedor.toJSON()
         return item

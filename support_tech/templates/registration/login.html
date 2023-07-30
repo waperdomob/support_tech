@@ -1,0 +1,64 @@
+{%  extends "base.html" %}
+{%  block title %}
+Login
+{%  endblock    %}
+
+{% load static %}
+
+{%  block styles %}
+<link rel="stylesheet" href="{% static 'css/login.css' %}">
+
+{%  endblock  %} 
+{%  block content   %}
+<br>
+<div class="container" >
+    <div class="row">
+        
+        <!-- div derecho imagen and texto  -->
+        <div class="col-md-6 col-12 " style="
+        position: relative;">
+                <img src="{% static 'img/support_tech_logo' %}" alt="" width="400rem" >                   
+        </div>
+
+        <div class="col-md-6 col-12 p-5 contenedor" style="
+        position: relative;">
+            <section>
+                <h1 class="tituloInicio" >Iniciar Sesión</h1>
+            </section>
+            <form method="post" action="{% url 'login' %}">
+                {%  csrf_token %}
+                <div class="form-group mt-4">
+                    <label for="exampleInputEmail1" class="textLabel">Nombre de Usuario</label>
+                    <input type="text" class="form-control" id="" aria-describedby="" name="username" required>
+                
+                </div>
+                <div class="form-group mt-4">
+                    <label for="exampleInputPassword1" class="textLabel">Password</label>
+                    <input type="password" class="form-control" id="Password1" name="password" required>
+                </div>
+                <section>
+                    <div class="container">
+                        <div class="row">
+
+                            <!-- olvidarContraseña -->
+                            <div class="col-sm mt-3">                               
+                                    <i class="fas fa-key"></i>
+                                    <a class="olvidoContrase" href="#">
+                                        Olvidaste tu contraseña?
+                                    </a>                                
+                            </div>
+                            <div class="d-grid gap-2 col-6 mx-auto">
+                                <button class="btn btn-primary btn-lg mt-3">
+                                    Login
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </form>
+        </div>
+    </div>
+      
+</div>
+
+{%  endblock  %}
